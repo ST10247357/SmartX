@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/SmartX.Api/SmartX.Api.csproj" />
+  </Folder>
+</Solution>
