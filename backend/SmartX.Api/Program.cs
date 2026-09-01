@@ -1,41 +1,69 @@
+using SmartX.Api.Models;
+using SmartX.Api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<SensorStore>();
+
+// Allow the React dev server to call this API.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+app.UseCors("AllowReactApp");
 
-var summaries = new[]
+// Register a new sensor.
+app.MapPost("/api/sensors/register", (SensorRegistrationRequest request, SensorStore store) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var record = store.Register(request);
+    return Results.Created($"/api/sensors/{record.DeviceMacAddress}", record);
+});
 
-app.MapGet("/weatherforecast", () =>
+// Push a telemetry reading for an existing sensor.
+app.MapPost("/api/telemetry", (TelemetryIngestRequest request, SensorStore store) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var updated = store.Ingest(request);
+    return updated is null
+        ? Results.NotFound(new { message = "Sensor not registered." })
+        : Results.Ok(updated);
+});
+
+// Get all registered sensors (used to populate the dashboard grid).
+app.MapGet("/api/sensors", (SensorStore store) => Results.Ok(store.GetAll()));
+
+// Get a single sensor by MAC address.
+app.MapGet("/api/sensors/{mac}", (string mac, SensorStore store) =>
+{
+    var sensor = store.GetByMac(mac);
+    return sensor is null ? Results.NotFound() : Results.Ok(sensor);
+});
+
+// Upload a config file, deployment photo, or hardware log for a sensor.
+app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, SensorStore store) =>
+{
+    var sensor = store.GetByMac(mac);
+    if (sensor is null) return Results.NotFound(new { message = "Sensor not registered." });
+
+    var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "Uploads", mac);
+    Directory.CreateDirectory(uploadsDir);
+
+    var filePath = Path.Combine(uploadsDir, file.FileName);
+    await using var stream = File.Create(filePath);
+    await file.CopyToAsync(stream);
+
+    return Results.Ok(new { message = "File uploaded.", fileName = file.FileName });
+}).DisableAntiforgery();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
