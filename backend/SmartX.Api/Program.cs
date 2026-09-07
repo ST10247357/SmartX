@@ -17,6 +17,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+MockDataSeeder.Seed(app.Services.GetRequiredService<SensorStore>());
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
