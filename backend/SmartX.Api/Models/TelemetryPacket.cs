@@ -25,7 +25,7 @@ public class TelemetryPacket<T> where T : struct
 
 public enum SensorCategory
 {
-    Enviromental,
+    Environmental,
     PowerConsumption,
     Actuator
 }

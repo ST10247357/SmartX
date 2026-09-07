@@ -23,25 +23,35 @@ public class SensorStore
     }
 
     public SensorRecord? Ingest(TelemetryIngestRequest request)
+{
+    lock (_lock)
     {
-        lock (_lock)
+        if (!_sensors.TryGetValue(request.DeviceMacAddress, out var sensor))
+            return null;
+
+        var previousReading = sensor.LastReading; // capture BEFORE overwrite
+
+        sensor.LastReading = request.Value;
+        sensor.LastSeen = DateTime.UtcNow;
+
+        sensor.CurrentSeverity = sensor.Category switch
         {
-            if (!_sensors.TryGetValue(request.DeviceMacAddress, out var sensor))
-                return null;
- 
-            sensor.LastReading = request.Value;
-            sensor.LastSeen = DateTime.UtcNow;
-            sensor.CurrentSeverity = sensor.Category switch
-            {
-                SensorCategory.Environmental => SeverityClassifier.ClassifyMoisture(request.Value),
-                SensorCategory.PowerConsumption => ClassifyPowerFromBaseline(sensor, request.Value),
-                SensorCategory.Actuator => SeverityClassifier.ClassifyValveState(request.Value != 0, true),
-                _ => SeverityLevel.Normal
-            };
- 
-            return sensor;
-        }
+            SensorCategory.Environmental => SeverityClassifier.ClassifyMoisture(request.Value),
+            SensorCategory.PowerConsumption => ClassifyPowerFromBaseline(sensor, previousReading, request.Value),
+            SensorCategory.Actuator => SeverityClassifier.ClassifyValveState(request.Value != 0, true),
+            _ => SeverityLevel.Normal
+        };
+
+        return sensor;
     }
+}
+
+private SeverityLevel ClassifyPowerFromBaseline(SensorRecord sensor, float? previousReading, float newValue)
+{
+    var baseline = new PowerReading(sensor.DeviceMacAddress, previousReading ?? newValue);
+    var current = new PowerReading(sensor.DeviceMacAddress, newValue);
+    return SeverityClassifier.ClassifyPower(current, baseline);
+}
  
     private SeverityLevel ClassifyPowerFromBaseline(SensorRecord sensor, float newValue)
     {
