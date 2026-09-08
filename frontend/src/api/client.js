@@ -36,3 +36,41 @@ export async function uploadFile(mac, file) {
   if (!res.ok) throw new Error("Failed to upload file");
   return res.json();
 }
+
+// ============================================
+// GAMIFICATION API FUNCTIONS
+// ============================================
+
+export async function getGamificationStats() {
+  const res = await fetch(`${BASE_URL}/gamification/stats`);
+  if (!res.ok) throw new Error("Failed to fetch gamification stats");
+  return res.json();
+}
+
+export async function getAlertHistory() {
+  const res = await fetch(`${BASE_URL}/gamification/alerts`);
+  if (!res.ok) throw new Error("Failed to fetch alert history");
+  return res.json();
+}
+
+export async function resolveAlert(macAddress) {
+  const res = await fetch(`${BASE_URL}/gamification/resolve/${macAddress}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to resolve alert");
+  return res.json();
+}
+
+// ============================================
+// DEPLOYMENT VALIDATION API FUNCTIONS
+// ============================================
+
+export async function validateDeployment(deploymentTree) {
+  const res = await fetch(`${BASE_URL}/deployment/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deploymentTree),
+  });
+  if (!res.ok) throw new Error("Failed to validate deployment");
+  return res.json();
+}

@@ -26,6 +26,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowReactApp");
 
+// ============================================
+// PART 1: SENSOR MANAGEMENT ENDPOINTS
+// ============================================
+
 // Register a new sensor.
 app.MapPost("/api/sensors/register", (SensorRegistrationRequest request, SensorStore store) =>
 {
@@ -67,5 +71,80 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
 
     return Results.Ok(new { message = "File uploaded.", fileName = file.FileName });
 }).DisableAntiforgery();
+
+// ============================================
+// PART 2: GAMIFICATION ENDPOINTS
+// ============================================
+
+// Get gamification statistics (health score, stability streak, quick response rate)
+app.MapGet("/api/gamification/stats", (SensorStore store) =>
+{
+    return Results.Ok(store.GetGamificationStats());
+});
+
+// Get alert history (for the gamification dashboard)
+app.MapGet("/api/gamification/alerts", (SensorStore store) =>
+{
+    return Results.Ok(store.GetAlertHistory());
+});
+
+// Mark a critical alert as resolved (simulates operator intervention)
+app.MapPost("/api/gamification/resolve/{mac}", (string mac, SensorStore store) =>
+{
+    var sensor = store.GetByMac(mac);
+    if (sensor == null)
+        return Results.NotFound(new { message = "Sensor not found." });
+
+    // Force a re-ingest with the same value to trigger resolution logic
+    // The Ingest() method will detect the severity change and handle resolution tracking
+    if (sensor.LastReading.HasValue)
+    {
+        store.Ingest(new TelemetryIngestRequest
+        {
+            DeviceMacAddress = mac,
+            Value = sensor.LastReading.Value
+        });
+        return Results.Ok(new
+        {
+            message = "Alert resolution attempted. Sensor status updated.",
+            mac = mac
+        });
+    }
+
+    return Results.BadRequest(new { message = "Sensor has no reading to resolve." });
+});
+
+// ============================================
+// PART 3: RECURSIVE DEPLOYMENT VALIDATION ENDPOINT
+// ============================================
+
+// Validate a nested device deployment tree using recursion
+app.MapPost("/api/deployment/validate", (DeploymentNode root) =>
+{
+    if (root == null)
+        return Results.BadRequest(new { message = "Invalid deployment tree." });
+
+    var isValid = root.ValidateHierarchy();
+    var invalidPath = root.FindFirstInvalidPath();
+
+    return Results.Ok(new
+    {
+        isValid = isValid,
+        message = isValid ? "All nodes are properly configured." : "Invalid configuration detected.",
+        invalidPath = invalidPath != null ? string.Join(" -> ", invalidPath) : null,
+        nodeCount = CountNodes(root)
+    });
+});
+
+// Helper function to count nodes in the deployment tree
+static int CountNodes(DeploymentNode node)
+{
+    int count = 1;
+    foreach (var child in node.Children)
+    {
+        count += CountNodes(child);
+    }
+    return count;
+}
 
 app.Run();
