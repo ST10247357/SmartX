@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<SensorStore>();
 
-// Allow the React dev server to call this API.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -17,7 +16,102 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-MockDataSeeder.Seed(app.Services.GetRequiredService<SensorStore>());
+var store = app.Services.GetRequiredService<SensorStore>();
+
+MockDataSeeder.Seed(store);
+
+Console.WriteLine("🚀 Starting Real-World Telemetry Simulator...");
+
+_ = Task.Run(async () =>
+{
+    var random = new Random();
+    var baselines = new Dictionary<string, float>();
+    
+    Console.WriteLine("📡 Telemetry Simulator Started - Realistic data every 10 seconds");
+    
+    while (true)
+    {
+        try
+        {
+            await Task.Delay(10000);
+            
+            var sensors = store.GetAll();
+            if (sensors.Count == 0) continue;
+            
+            foreach (var sensor in sensors)
+            {
+                if (!baselines.ContainsKey(sensor.DeviceMacAddress))
+                {
+                    baselines[sensor.DeviceMacAddress] = sensor.LastReading ?? 50f;
+                }
+            }
+            
+            foreach (var sensor in sensors)
+            {
+                float newValue;
+                float currentBaseline = baselines[sensor.DeviceMacAddress];
+                
+                switch (sensor.Category)
+                {
+                    case SensorCategory.Environmental:
+                        float drift = (float)(random.NextDouble() * 6 - 3);
+                        newValue = currentBaseline + drift;
+                        newValue = Math.Clamp(newValue, 5, 95);
+                        break;
+                        
+                    case SensorCategory.PowerConsumption:
+                        float powerDrift = (float)(random.NextDouble() * 100 - 50);
+                        newValue = currentBaseline + powerDrift;
+                        newValue = Math.Clamp(newValue, 100, 5000);
+                        break;
+                        
+                    case SensorCategory.Actuator:
+                        if (random.NextDouble() > 0.9)
+                        {
+                            newValue = currentBaseline > 0.5 ? 0 : 1;
+                        }
+                        else
+                        {
+                            newValue = currentBaseline;
+                        }
+                        break;
+                        
+                    default:
+                        newValue = currentBaseline + (float)(random.NextDouble() * 10 - 5);
+                        break;
+                }
+                
+                baselines[sensor.DeviceMacAddress] = newValue;
+                
+                store.Ingest(new TelemetryIngestRequest
+                {
+                    DeviceMacAddress = sensor.DeviceMacAddress,
+                    Value = newValue
+                });
+            }
+            
+            var criticalCount = sensors.Count(s => s.CurrentSeverity == SeverityLevel.Critical);
+            var warningCount = sensors.Count(s => s.CurrentSeverity == SeverityLevel.Warning);
+            
+            if (criticalCount > 0)
+            {
+                Console.WriteLine($"⚠️ {DateTime.Now:HH:mm:ss} - {criticalCount} critical, {warningCount} warning");
+            }
+            else if (warningCount > 0)
+            {
+                Console.WriteLine($"⚠️ {DateTime.Now:HH:mm:ss} - {warningCount} warnings");
+            }
+            else
+            {
+                Console.WriteLine($"✅ {DateTime.Now:HH:mm:ss} - All {sensors.Count} sensors normal");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Simulator error: {ex.Message}");
+        }
+    }
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -26,37 +120,33 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowReactApp");
 
-// ============================================
-// PART 1: SENSOR MANAGEMENT ENDPOINTS
-// ============================================
-
-// Register a new sensor.
 app.MapPost("/api/sensors/register", (SensorRegistrationRequest request, SensorStore store) =>
 {
     var record = store.Register(request);
+    Console.WriteLine($"✅ Sensor registered: {record.DeviceMacAddress} in {record.Zone}");
     return Results.Created($"/api/sensors/{record.DeviceMacAddress}", record);
 });
 
-// Push a telemetry reading for an existing sensor.
 app.MapPost("/api/telemetry", (TelemetryIngestRequest request, SensorStore store) =>
 {
     var updated = store.Ingest(request);
-    return updated is null
-        ? Results.NotFound(new { message = "Sensor not registered." })
-        : Results.Ok(updated);
+    if (updated is null)
+    {
+        return Results.NotFound(new { message = "Sensor not registered." });
+    }
+    
+    Console.WriteLine($"📡 Telemetry: {request.DeviceMacAddress} = {request.Value} → Severity: {updated.CurrentSeverity}");
+    return Results.Ok(updated);
 });
 
-// Get all registered sensors (used to populate the dashboard grid).
 app.MapGet("/api/sensors", (SensorStore store) => Results.Ok(store.GetAll()));
 
-// Get a single sensor by MAC address.
 app.MapGet("/api/sensors/{mac}", (string mac, SensorStore store) =>
 {
     var sensor = store.GetByMac(mac);
     return sensor is null ? Results.NotFound() : Results.Ok(sensor);
 });
 
-// Upload a config file, deployment photo, or hardware log for a sensor.
 app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, SensorStore store) =>
 {
     var sensor = store.GetByMac(mac);
@@ -69,34 +159,26 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
     await using var stream = File.Create(filePath);
     await file.CopyToAsync(stream);
 
+    Console.WriteLine($"📎 File uploaded: {file.FileName} for {mac}");
     return Results.Ok(new { message = "File uploaded.", fileName = file.FileName });
 }).DisableAntiforgery();
 
-// ============================================
-// PART 2: GAMIFICATION ENDPOINTS
-// ============================================
-
-// Get gamification statistics (health score, stability streak, quick response rate)
 app.MapGet("/api/gamification/stats", (SensorStore store) =>
 {
     return Results.Ok(store.GetGamificationStats());
 });
 
-// Get alert history (for the gamification dashboard)
 app.MapGet("/api/gamification/alerts", (SensorStore store) =>
 {
     return Results.Ok(store.GetAlertHistory());
 });
 
-// Mark a critical alert as resolved (simulates operator intervention)
 app.MapPost("/api/gamification/resolve/{mac}", (string mac, SensorStore store) =>
 {
     var sensor = store.GetByMac(mac);
     if (sensor == null)
         return Results.NotFound(new { message = "Sensor not found." });
 
-    // Force a re-ingest with the same value to trigger resolution logic
-    // The Ingest() method will detect the severity change and handle resolution tracking
     if (sensor.LastReading.HasValue)
     {
         store.Ingest(new TelemetryIngestRequest
@@ -104,6 +186,8 @@ app.MapPost("/api/gamification/resolve/{mac}", (string mac, SensorStore store) =
             DeviceMacAddress = mac,
             Value = sensor.LastReading.Value
         });
+        
+        Console.WriteLine($"✅ Alert resolved for: {mac}");
         return Results.Ok(new
         {
             message = "Alert resolution attempted. Sensor status updated.",
@@ -114,11 +198,6 @@ app.MapPost("/api/gamification/resolve/{mac}", (string mac, SensorStore store) =
     return Results.BadRequest(new { message = "Sensor has no reading to resolve." });
 });
 
-// ============================================
-// PART 3: RECURSIVE DEPLOYMENT VALIDATION ENDPOINT
-// ============================================
-
-// Validate a nested device deployment tree using recursion
 app.MapPost("/api/deployment/validate", (DeploymentNode root) =>
 {
     if (root == null)
@@ -136,7 +215,6 @@ app.MapPost("/api/deployment/validate", (DeploymentNode root) =>
     });
 });
 
-// Helper function to count nodes in the deployment tree
 static int CountNodes(DeploymentNode node)
 {
     int count = 1;
@@ -146,5 +224,35 @@ static int CountNodes(DeploymentNode node)
     }
     return count;
 }
+
+app.MapGet("/api/deployment/zone-status", (SensorStore store) =>
+{
+    var root = store.BuildZoneHierarchy();
+    var isValid = store.ValidateZoneHierarchy();
+    var invalidZone = store.FindMissingDataZone();
+    var nodeCount = store.CountZoneNodes();
+
+    return Results.Ok(new
+    {
+        isValid = isValid,
+        invalidZone = invalidZone,
+        nodeCount = nodeCount,
+        message = isValid 
+            ? "All zones have active sensors with data." 
+            : $"Zone '{invalidZone}' has sensors with no data.",
+        tree = new
+        {
+            name = root.Name,
+            isConfigured = root.IsConfigured,
+            childCount = root.Children.Count,
+            children = root.Children.Select(c => new
+            {
+                name = c.Name,
+                isConfigured = c.IsConfigured,
+                childCount = c.Children.Count
+            })
+        }
+    });
+});
 
 app.Run();

@@ -58,11 +58,9 @@ public class SensorStore
                 _alertHistory.Add(alert);
                 _stats.TotalCriticalAlerts++;
                 _stats.LastCriticalAlertTime = DateTime.UtcNow;
-                
-                // Reset stability streak
                 _stats.StabilityStreakHours = 0;
             }
-            
+
             // Track resolution
             if (sensor.CurrentSeverity != SeverityLevel.Critical && previousSeverity == SeverityLevel.Critical)
             {
@@ -70,30 +68,30 @@ public class SensorStore
                     .Where(a => a.DeviceMacAddress == sensor.DeviceMacAddress && !a.IsResolved)
                     .OrderByDescending(a => a.DetectedAt)
                     .FirstOrDefault();
-                    
+
                 if (activeAlert != null)
                 {
                     activeAlert.ResolvedAt = DateTime.UtcNow;
                     activeAlert.ValueAtResolution = request.Value;
                     _stats.ResolvedAlerts++;
-                    
+
                     if (activeAlert.IsQuickResolution)
                         _stats.QuickResolutions++;
-                    
+
                     if (!_stats.SensorResolutionCounts.ContainsKey(sensor.DeviceMacAddress))
                         _stats.SensorResolutionCounts[sensor.DeviceMacAddress] = 0;
                     _stats.SensorResolutionCounts[sensor.DeviceMacAddress]++;
                 }
             }
 
-            // Update stability streak (if no critical alerts are active)
+            // Update stability streak
             if (!_alertHistory.Any(a => !a.IsResolved && a.Severity == SeverityLevel.Critical))
             {
                 var lastAlert = _alertHistory
                     .Where(a => a.Severity == SeverityLevel.Critical)
                     .OrderByDescending(a => a.DetectedAt)
                     .FirstOrDefault();
-                    
+
                 if (lastAlert != null && lastAlert.IsResolved)
                 {
                     var hoursSinceResolution = (DateTime.UtcNow - lastAlert.ResolvedAt.Value).TotalHours;
@@ -101,8 +99,7 @@ public class SensorStore
                 }
                 else if (!_alertHistory.Any(a => a.Severity == SeverityLevel.Critical))
                 {
-                    // No critical alerts ever - system is perfectly stable
-                    _stats.StabilityStreakHours = 24; // Start with 24 hours
+                    _stats.StabilityStreakHours = 24;
                 }
             }
 
@@ -147,5 +144,86 @@ public class SensorStore
         {
             return _alertHistory.OrderByDescending(a => a.DetectedAt).ToList();
         }
+    }
+
+    // ============================================
+    // ZONE HIERARCHY METHODS (USING RECURSION)
+    // ============================================
+
+    /// <summary>
+    /// Builds a hierarchical tree of zones from registered sensors.
+    /// </summary>
+    public DeploymentNode BuildZoneHierarchy()
+    {
+        var root = new DeploymentNode { Name = "Smart-X Facility", IsConfigured = true };
+        var zoneMap = new Dictionary<string, DeploymentNode>();
+
+        lock (_lock)
+        {
+            foreach (var sensor in _sensors.Values)
+            {
+                // Split zone by '-' (e.g., "Greenhouse-A" -> ["Greenhouse", "A"])
+                var zoneParts = sensor.Zone.Split('-');
+                var parent = root;
+
+                foreach (var part in zoneParts)
+                {
+                    var key = parent.Name + "->" + part;
+                    if (!zoneMap.ContainsKey(key))
+                    {
+                        var node = new DeploymentNode
+                        {
+                            Name = part,
+                            IsConfigured = sensor.LastReading.HasValue // Has data = configured
+                        };
+                        zoneMap[key] = node;
+                        parent.Children.Add(node);
+                    }
+                    parent = zoneMap[key];
+                }
+            }
+        }
+
+        return root;
+    }
+
+    /// <summary>
+    /// Recursively validates the entire zone hierarchy.
+    /// Returns true if all zones have sensors with data.
+    /// </summary>
+    public bool ValidateZoneHierarchy()
+    {
+        var root = BuildZoneHierarchy();
+        return root.ValidateHierarchy();
+    }
+
+    /// <summary>
+    /// Recursively finds the first invalid zone in the hierarchy.
+    /// Returns the path to the invalid zone as a string.
+    /// </summary>
+    public string? FindMissingDataZone()
+    {
+        var root = BuildZoneHierarchy();
+        var invalidPath = root.FindFirstInvalidPath();
+        return invalidPath != null ? string.Join(" -> ", invalidPath) : null;
+    }
+
+    /// <summary>
+    /// Recursively counts all nodes in the zone hierarchy.
+    /// </summary>
+    public int CountZoneNodes()
+    {
+        var root = BuildZoneHierarchy();
+        return CountNodesRecursive(root);
+    }
+
+    private int CountNodesRecursive(DeploymentNode node)
+    {
+        int count = 1;
+        foreach (var child in node.Children)
+        {
+            count += CountNodesRecursive(child);
+        }
+        return count;
     }
 }
