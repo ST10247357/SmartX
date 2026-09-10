@@ -1,10 +1,12 @@
 namespace SmartX.Api.Models;
 
+// Adapted from: GeeksforGeeks (2024) - "Depth First Search or DFS for a Graph"
+// Implements recursive DFS traversal to validate node configuration states and backtrack invalid paths
 public class DeploymentNode
 {
-    public string Name {get;set;} = string.Empty;
-    public bool IsConfigured {get;set;}
-    public List<DeploymentNode> Children {get;set;} = new();
+    public string Name { get; set; } = string.Empty;
+    public bool IsConfigured { get; set; }
+    public List<DeploymentNode> Children { get; set; } = new();
 
     public bool ValidateHierarchy()
     {
@@ -32,3 +34,8 @@ public class DeploymentNode
         return null;
     }
 }
+
+/*
+References:
+GeeksforGeeks, 2024. Depth First Search or DFS for a Graph. Available at: https://www.geeksforgeeks.org/dsa/depth-first-search-or-dfs-for-a-graph/ [Accessed 10 September 2026].
+*/

@@ -4,8 +4,11 @@ using SmartX.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+// Adapted from Singleton Service Lifetime Pattern (Fowler, 2002; Microsoft, 2024a)
 builder.Services.AddSingleton<SensorStore>();
 
+// Adapted from ASP.NET Core CORS Middleware Configuration (Microsoft, 2024b)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -19,8 +22,7 @@ var app = builder.Build();
 var store = app.Services.GetRequiredService<SensorStore>();
 MockDataSeeder.Seed(store);
 
-// Background simulator: pushes a new reading for every sensor every 10s,
-// proving the data structures handle continuous load, not just one-off calls.
+// Adapted from Asynchronous Non-blocking Background Worker Tasks (Albahari & Albahari, 2021; GeeksforGeeks, 2023a)
 _ = Task.Run(async () =>
 {
     var random = new Random();
@@ -47,8 +49,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowReactApp");
 
-// --- Sensor management ---
-
+// Adapted from Minimal API HTTP Post Route Mapping & Typed Results (Microsoft, 2024a)
 app.MapPost("/api/sensors/register", (SensorRegistrationRequest request, SensorStore store) =>
 {
     var record = store.Register(request);
@@ -71,6 +72,7 @@ app.MapGet("/api/sensors/{mac}", (string mac, SensorStore store) =>
     return sensor is null ? Results.NotFound() : Results.Ok(sensor);
 });
 
+// Adapted from Asynchronous Multipart Form File Handling & Direct Storage Operations (GeeksforGeeks, 2023b)
 app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, SensorStore store) =>
 {
     var sensor = store.GetByMac(mac);
@@ -86,8 +88,6 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
     return Results.Ok(new { message = "File uploaded.", fileName = file.FileName });
 }).DisableAntiforgery();
 
-// --- Gamification: star ratings + alert resolution ---
-
 app.MapGet("/api/gamification/summary", (SensorStore store) => Results.Ok(store.GetSummary()));
 
 app.MapGet("/api/gamification/alerts", (SensorStore store) => Results.Ok(store.GetAlerts()));
@@ -99,8 +99,6 @@ app.MapPost("/api/gamification/resolve/{mac}", (string mac, SensorStore store) =
         ? Results.NotFound(new { message = "Sensor not found." })
         : Results.Ok(new { message = result });
 });
-
-// --- Batch telemetry: demonstrates jagged array -> List<T> transfer ---
 
 app.MapPost("/api/telemetry/batch", (List<DeviceBatch> batches, SensorStore store) =>
 {
@@ -142,3 +140,13 @@ app.MapGet("/api/deployment/zone-status", (SensorStore store) =>
 });
 
 app.Run();
+
+/*
+References:
+Albahari, J. and Albahari, B., 2021. C# 10 in a Nutshell: The Definitive Reference. Sebastopol: O'Reilly Media.
+Fowler, M., 2002. Patterns of Enterprise Application Architecture. Boston: Addison-Wesley.
+GeeksforGeeks, 2023a. Task.Run() Method in C#. GeeksforGeeks. Available at: https://www.geeksforgeeks.org/task-run-method-in-c-sharp/ [Accessed 10 September 2026].
+GeeksforGeeks, 2023b. File I/O in C#. GeeksforGeeks. Available at: https://www.geeksforgeeks.org/file-handling-in-c-sharp/ [Accessed 10 September 2026].
+Microsoft, 2024a. Minimal APIs overview. Microsoft Learn. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis [Accessed 10 September 2026].
+Microsoft, 2024b. Enable Cross-Origin Requests (CORS) in ASP.NET Core. Microsoft Learn. Available at: https://learn.microsoft.com/en-us/aspnet/core/security/cors [Accessed 10 September 2026].
+*/

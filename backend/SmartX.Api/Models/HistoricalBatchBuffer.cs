@@ -1,7 +1,7 @@
 namespace SmartX.Api.Models;
 
-// Buffers raw readings per device in a jagged array (rows vary in length),
-// then transfers them into an optimised List<T> for storage/querying.
+// Adapted from: GeeksforGeeks (2023) - "Jagged Array or Array of Arrays in C# with Examples"
+// Uses a jagged array (_rawBatches) to buffer variable-length sensor readings per device before flattening into structured lists
 public class HistoricalBatchBuffer
 {
     private float[][] _rawBatches;
@@ -42,3 +42,8 @@ public class HistoricalBatchBuffer
         return result;
     }
 }
+
+/*
+References:
+GeeksforGeeks, 2023. Jagged Array or Array of Arrays in C# with Examples. Available at: https://www.geeksforgeeks.org/c/jagged-array-or-array-of-arrays-in-c-with-examples/ [Accessed 10 September 2026].
+*/

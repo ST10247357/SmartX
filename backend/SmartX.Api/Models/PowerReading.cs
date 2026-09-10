@@ -1,6 +1,7 @@
 namespace SmartX.Api.Models;
 
-// Power reading with overloaded operators for aggregation and delta comparison.
+// Adapted from operator overloading principles (GeeksforGeeks, 2024)
+// Overloads arithmetic (+, -) and comparison (<, >) operators to allow direct aggregation and delta computation of telemetry readings
 public struct PowerReading
 {
     public string NodeId { get; set; }
@@ -25,3 +26,8 @@ public struct PowerReading
 
     public override string ToString() => $"{NodeId}: {Watts:F2}W @ {Timestamp:HH:mm:ss}";
 }
+
+/*
+References:
+GeeksforGeeks, 2024. Operator Overloading in C++. Available at: https://www.geeksforgeeks.org/cpp/operator-overloading-cpp/ [Accessed 10 September 2026].
+*/

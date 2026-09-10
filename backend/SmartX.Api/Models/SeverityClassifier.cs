@@ -7,6 +7,8 @@ public enum SeverityLevel
     Critical
 }
 
+// Adapted from enumeration and static utility class patterns (Microsoft, 2024)
+// Classifies telemetry anomalies based on moisture thresholds, power surge deltas, and state mismatches
 public static class SeverityClassifier
 {
     public static SeverityLevel ClassifyMoisture(float percent)
@@ -32,3 +34,8 @@ public static class SeverityClassifier
     public static SeverityLevel ClassifyValveState(bool isOpen, bool expectedOpen) =>
         isOpen != expectedOpen ? SeverityLevel.Warning : SeverityLevel.Normal;
 }
+
+/*
+References:
+Microsoft, 2024. Enumeration types (C# reference). Microsoft Learn. Available at: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/enum [Accessed 10 September 2026].
+*/

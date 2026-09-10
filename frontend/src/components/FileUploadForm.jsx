@@ -2,6 +2,7 @@ import { useState } from "react";
 import { uploadFile } from "../api/client";
 
 export default function FileUploadForm({ sensors, colors }) {
+  // Adapted from React useState Hook for Component Form State (React Docs, 2024b)
   const [selectedMac, setSelectedMac] = useState("");
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState(null);
@@ -15,6 +16,7 @@ export default function FileUploadForm({ sensors, colors }) {
     primary: '#58a6ff',
   };
 
+  // Adapted from React Event Handling & Asynchronous Form Submissions (React Docs, 2024a)
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus(null);
@@ -28,8 +30,9 @@ export default function FileUploadForm({ sensors, colors }) {
 
     try {
       const result = await uploadFile(selectedMac, file);
-      setStatus({ type: "success", message: `✅ Uploaded ${result.fileName} to ${selectedMac}` });
+      setStatus({ type: "success", message: `Uploaded ${result.fileName} to ${selectedMac}.` });
       setFile(null);
+      // Adapted from HTML5 File Input Handling & Value Resetting (MDN Web Docs, 2024)
       document.getElementById('fileInput').value = '';
     } catch (err) {
       setStatus({ type: "error", message: err.message });
@@ -40,20 +43,13 @@ export default function FileUploadForm({ sensors, colors }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 12,
-        marginBottom: 12
-      }}>
+      <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 15, color: darkColors.text }}>
+        Attach File
+      </h3>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14, marginBottom: 14 }}>
         <div>
-          <label style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: darkColors.textSecondary,
-            display: 'block',
-            marginBottom: 4
-          }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: darkColors.textSecondary, display: 'block', marginBottom: 4 }}>
             Select Sensor
           </label>
           <select
@@ -68,21 +64,13 @@ export default function FileUploadForm({ sensors, colors }) {
               color: darkColors.text,
               fontSize: 13,
               outline: 'none',
-              cursor: 'pointer'
+              boxSizing: 'border-box',
+              cursor: 'pointer',
             }}
           >
-            <option value="" style={{
-              backgroundColor: darkColors.surface2,
-              color: darkColors.textSecondary
-            }}>
-              -- Select a sensor --
-            </option>
-            {sensors.map((s) => (
-              <option key={s.deviceMacAddress} value={s.deviceMacAddress} style={{
-                backgroundColor: darkColors.surface2,
-                color: darkColors.text,
-                padding: '6px'
-              }}>
+            <option value="">-- Select a sensor --</option>
+            {(sensors || []).map((s) => (
+              <option key={s.deviceMacAddress} value={s.deviceMacAddress}>
                 {s.deviceMacAddress} ({s.zone})
               </option>
             ))}
@@ -90,13 +78,7 @@ export default function FileUploadForm({ sensors, colors }) {
         </div>
 
         <div>
-          <label style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: darkColors.textSecondary,
-            display: 'block',
-            marginBottom: 4
-          }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: darkColors.textSecondary, display: 'block', marginBottom: 4 }}>
             Choose File
           </label>
           <input
@@ -110,7 +92,8 @@ export default function FileUploadForm({ sensors, colors }) {
               border: `1px solid ${darkColors.border}`,
               backgroundColor: darkColors.surface2,
               color: darkColors.text,
-              fontSize: 12
+              fontSize: 12,
+              boxSizing: 'border-box',
             }}
           />
         </div>
@@ -128,29 +111,24 @@ export default function FileUploadForm({ sensors, colors }) {
           fontWeight: 600,
           fontSize: 13,
           cursor: isUploading ? 'not-allowed' : 'pointer',
-          transition: 'all 0.2s',
-          width: '100%'
-        }}
-        onMouseEnter={(e) => {
-          if (!isUploading) e.currentTarget.style.backgroundColor = '#4a8dd6';
-        }}
-        onMouseLeave={(e) => {
-          if (!isUploading) e.currentTarget.style.backgroundColor = darkColors.primary;
+          width: '100%',
         }}
       >
-        {isUploading ? '⏳ Uploading...' : '📤 Upload File'}
+        {isUploading ? 'Uploading...' : 'Upload File'}
       </button>
 
       {status && (
-        <p style={{
-          marginTop: 10,
-          color: status.type === "error" ? '#f85149' : '#3fb950',
-          fontSize: 13,
-          fontWeight: 500
-        }}>
+        <p style={{ marginTop: 10, color: status.type === "error" ? '#f85149' : '#3fb950', fontSize: 13, fontWeight: 500 }}>
           {status.message}
         </p>
       )}
     </form>
   );
 }
+
+/*
+References:
+MDN Web Docs, 2024. HTMLInputElement.files. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/files [Accessed 10 September 2026].
+React Docs, 2024a. Responding to Events. React Documentation. Available at: https://react.dev/learn/responding-to-events [Accessed 10 September 2026].
+React Docs, 2024b. useState. React Documentation. Available at: https://react.dev/reference/react/useState [Accessed 10 September 2026].
+*/
