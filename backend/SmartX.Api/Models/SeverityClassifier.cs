@@ -16,12 +16,15 @@ public static class SeverityClassifier
         return SeverityLevel.Normal;
     }
 
+    // Spikes (current > baseline) are treated as more dangerous than drops
+    // (current < baseline) - a surge is usually a bigger risk than a dip.
     public static SeverityLevel ClassifyPower(PowerReading current, PowerReading baseline)
     {
         var delta = current - baseline;
         var percentChange = baseline.Watts == 0 ? 0 : Math.Abs(delta.Watts) / baseline.Watts;
 
-        if (percentChange > 0.5) return SeverityLevel.Critical;
+        if (current > baseline && percentChange > 0.5) return SeverityLevel.Critical; // spike
+        if (current < baseline && percentChange > 0.5) return SeverityLevel.Warning;  // big drop
         if (percentChange > 0.2) return SeverityLevel.Warning;
         return SeverityLevel.Normal;
     }
