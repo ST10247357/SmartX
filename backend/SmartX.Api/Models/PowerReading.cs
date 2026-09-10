@@ -1,12 +1,11 @@
-using System.Diagnostics.Eventing.Reader;
-
 namespace SmartX.Api.Models;
 
+// Power reading with overloaded operators for aggregation and delta comparison.
 public struct PowerReading
 {
-    public string NodeId {get;set;}
-    public double Watts {get;set;}
-    public DateTime Timestamp {get;set;}
+    public string NodeId { get; set; }
+    public double Watts { get; set; }
+    public DateTime Timestamp { get; set; }
 
     public PowerReading(string nodeId, double watts)
     {
@@ -25,5 +24,4 @@ public struct PowerReading
     public static bool operator <(PowerReading a, PowerReading b) => a.Watts < b.Watts;
 
     public override string ToString() => $"{NodeId}: {Watts:F2}W @ {Timestamp:HH:mm:ss}";
-
 }

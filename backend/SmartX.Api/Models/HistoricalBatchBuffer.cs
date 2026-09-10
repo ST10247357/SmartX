@@ -1,5 +1,7 @@
 namespace SmartX.Api.Models;
 
+// Buffers raw readings per device in a jagged array (rows vary in length),
+// then transfers them into an optimised List<T> for storage/querying.
 public class HistoricalBatchBuffer
 {
     private float[][] _rawBatches;
@@ -18,10 +20,11 @@ public class HistoricalBatchBuffer
 
         if (index >= _rawBatches.Length)
             Array.Resize(ref _rawBatches, _rawBatches.Length + 1);
-        
+
         _rawBatches[index] = readings;
     }
 
+    // Flattens jagged data into the List<T> structure the rest of the app uses.
     public List<TelemetryPacket<float>> TransferToOptimisedList(string zone, SensorCategory category)
     {
         var result = new List<TelemetryPacket<float>>();

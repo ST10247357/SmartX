@@ -2,11 +2,11 @@ using SmartX.Api.Models;
 
 namespace SmartX.Api.Services;
 
+// In-memory store keyed by MAC address for instant lookups when telemetry arrives.
 public class SensorStore
 {
     private readonly Dictionary<string, SensorRecord> _sensors = new();
-    private readonly List<AlertRecord> _alertHistory = new();
-    private readonly GamificationStats _stats = new();
+    private readonly List<AlertRecord> _alerts = new();
     private readonly object _lock = new();
 
     public SensorRecord Register(SensorRegistrationRequest request)
@@ -31,87 +31,81 @@ public class SensorStore
             if (!_sensors.TryGetValue(request.DeviceMacAddress, out var sensor))
                 return null;
 
-            var previousSeverity = sensor.CurrentSeverity;
-            var previousReading = sensor.LastReading;
-
+            var previousReading = sensor.LastReading; // capture before overwrite
             sensor.LastReading = request.Value;
             sensor.LastSeen = DateTime.UtcNow;
 
-            sensor.CurrentSeverity = sensor.Category switch
+            bool isCritical = sensor.Category switch
             {
-                SensorCategory.Environmental => SeverityClassifier.ClassifyMoisture(request.Value),
-                SensorCategory.PowerConsumption => ClassifyPowerFromBaseline(sensor, previousReading, request.Value),
-                SensorCategory.Actuator => SeverityClassifier.ClassifyValveState(request.Value != 0, true),
-                _ => SeverityLevel.Normal
+                SensorCategory.Environmental =>
+                    SeverityClassifier.ClassifyMoisture(request.Value) == SeverityLevel.Critical,
+                SensorCategory.PowerConsumption =>
+                    ClassifyPowerCritical(sensor, previousReading, request.Value),
+                _ => false
             };
 
-            // Track critical alerts
-            if (sensor.CurrentSeverity == SeverityLevel.Critical && previousSeverity != SeverityLevel.Critical)
+            if (isCritical)
             {
-                var alert = new AlertRecord
+                sensor.StarRating = 1;
+                _alerts.Add(new AlertRecord
                 {
                     DeviceMacAddress = sensor.DeviceMacAddress,
-                    Severity = SeverityLevel.Critical,
-                    DetectedAt = DateTime.UtcNow,
                     ValueAtDetection = request.Value
-                };
-                _alertHistory.Add(alert);
-                _stats.TotalCriticalAlerts++;
-                _stats.LastCriticalAlertTime = DateTime.UtcNow;
-                _stats.StabilityStreakHours = 0;
-            }
-
-            // Track resolution
-            if (sensor.CurrentSeverity != SeverityLevel.Critical && previousSeverity == SeverityLevel.Critical)
-            {
-                var activeAlert = _alertHistory
-                    .Where(a => a.DeviceMacAddress == sensor.DeviceMacAddress && !a.IsResolved)
-                    .OrderByDescending(a => a.DetectedAt)
-                    .FirstOrDefault();
-
-                if (activeAlert != null)
-                {
-                    activeAlert.ResolvedAt = DateTime.UtcNow;
-                    activeAlert.ValueAtResolution = request.Value;
-                    _stats.ResolvedAlerts++;
-
-                    if (activeAlert.IsQuickResolution)
-                        _stats.QuickResolutions++;
-
-                    if (!_stats.SensorResolutionCounts.ContainsKey(sensor.DeviceMacAddress))
-                        _stats.SensorResolutionCounts[sensor.DeviceMacAddress] = 0;
-                    _stats.SensorResolutionCounts[sensor.DeviceMacAddress]++;
-                }
-            }
-
-            // Update stability streak
-            if (!_alertHistory.Any(a => !a.IsResolved && a.Severity == SeverityLevel.Critical))
-            {
-                var lastAlert = _alertHistory
-                    .Where(a => a.Severity == SeverityLevel.Critical)
-                    .OrderByDescending(a => a.DetectedAt)
-                    .FirstOrDefault();
-
-                if (lastAlert != null && lastAlert.IsResolved)
-                {
-                    var hoursSinceResolution = (DateTime.UtcNow - lastAlert.ResolvedAt.Value).TotalHours;
-                    _stats.StabilityStreakHours = (int)hoursSinceResolution;
-                }
-                else if (!_alertHistory.Any(a => a.Severity == SeverityLevel.Critical))
-                {
-                    _stats.StabilityStreakHours = 24;
-                }
+                });
             }
 
             return sensor;
         }
     }
 
-    private SeverityLevel ClassifyPowerFromBaseline(SensorRecord sensor, float? previousReading, float newValue)
+    private bool ClassifyPowerCritical(SensorRecord sensor, float? previousReading, float newValue)
     {
         var baseline = new PowerReading(sensor.DeviceMacAddress, previousReading ?? newValue);
         var current = new PowerReading(sensor.DeviceMacAddress, newValue);
-        return SeverityClassifier.ClassifyPower(current, baseline);
+        return SeverityClassifier.ClassifyPower(current, baseline) == SeverityLevel.Critical;
+    }
+
+    // Operator acknowledges the most recent open alert for a sensor.
+    // Restores one star (capped at 5) and logs the resolution.
+    public string? ResolveAlert(string mac)
+    {
+        lock (_lock)
+        {
+            var sensor = GetByMac(mac);
+            if (sensor is null) return null;
+
+            var alert = _alerts.FirstOrDefault(a => a.DeviceMacAddress == mac && !a.IsResolved);
+            if (alert is null) return "No active alert for this sensor.";
+
+            alert.ResolvedAt = DateTime.UtcNow;
+            sensor.StarRating = Math.Min(5, sensor.StarRating + 1);
+            sensor.ResolutionCount++;
+
+            return $"Resolved. {sensor.DeviceMacAddress} is now {sensor.StarRating} stars.";
+        }
+    }
+
+    // Simple counts for the dashboard summary panel - no stored state to drift out of sync.
+    public object GetSummary()
+    {
+        lock (_lock)
+        {
+            return new
+            {
+                totalSensors = _sensors.Count,
+                openAlerts = _alerts.Count(a => !a.IsResolved),
+                totalResolutions = _sensors.Values.Sum(s => s.ResolutionCount),
+                averageStarRating = _sensors.Count == 0 ? 5 : _sensors.Values.Average(s => s.StarRating)
+            };
+        }
+    }
+
+    public List<AlertRecord> GetAlerts()
+    {
+        lock (_lock)
+        {
+            return _alerts.OrderByDescending(a => a.DetectedAt).ToList();
+        }
     }
 
     public List<SensorRecord> GetAll()
@@ -130,100 +124,40 @@ public class SensorStore
         }
     }
 
-    public GamificationStats GetGamificationStats()
+    // Adds together every power sensor's last reading in a zone, using the
+// overloaded + operator instead of manually summing numbers.
+public PowerReading GetZoneTotalPower(string zone)
+{
+    var total = new PowerReading(zone, 0);
+    var powerSensors = _sensors.Values.Where(s => s.Zone == zone && s.Category == SensorCategory.PowerConsumption);
+
+    foreach (var sensor in powerSensors)
+        total += new PowerReading(sensor.DeviceMacAddress, sensor.LastReading ?? 0);
+
+    return total;
+}
+
+// Builds a 3-level tree: Smart-X facility -> one node per zone -> one leaf per sensor.
+// A sensor node is "configured" if it has reported a reading at least once.
+public DeploymentNode BuildZoneTree()
+{
+    var root = new DeploymentNode { Name = "Smart-X Facility", IsConfigured = true };
+
+    var zoneGroups = _sensors.Values.GroupBy(s => s.Zone);
+    foreach (var group in zoneGroups)
     {
-        lock (_lock)
+        var zoneNode = new DeploymentNode { Name = group.Key, IsConfigured = true };
+        foreach (var sensor in group)
         {
-            return _stats;
-        }
-    }
-
-    public List<AlertRecord> GetAlertHistory()
-    {
-        lock (_lock)
-        {
-            return _alertHistory.OrderByDescending(a => a.DetectedAt).ToList();
-        }
-    }
-
-    // ============================================
-    // ZONE HIERARCHY METHODS (USING RECURSION)
-    // ============================================
-
-    /// <summary>
-    /// Builds a hierarchical tree of zones from registered sensors.
-    /// </summary>
-    public DeploymentNode BuildZoneHierarchy()
-    {
-        var root = new DeploymentNode { Name = "Smart-X Facility", IsConfigured = true };
-        var zoneMap = new Dictionary<string, DeploymentNode>();
-
-        lock (_lock)
-        {
-            foreach (var sensor in _sensors.Values)
+            zoneNode.Children.Add(new DeploymentNode
             {
-                // Split zone by '-' (e.g., "Greenhouse-A" -> ["Greenhouse", "A"])
-                var zoneParts = sensor.Zone.Split('-');
-                var parent = root;
-
-                foreach (var part in zoneParts)
-                {
-                    var key = parent.Name + "->" + part;
-                    if (!zoneMap.ContainsKey(key))
-                    {
-                        var node = new DeploymentNode
-                        {
-                            Name = part,
-                            IsConfigured = sensor.LastReading.HasValue // Has data = configured
-                        };
-                        zoneMap[key] = node;
-                        parent.Children.Add(node);
-                    }
-                    parent = zoneMap[key];
-                }
-            }
+                Name = sensor.DeviceMacAddress,
+                IsConfigured = sensor.LastReading.HasValue
+            });
         }
-
-        return root;
+        root.Children.Add(zoneNode);
     }
 
-    /// <summary>
-    /// Recursively validates the entire zone hierarchy.
-    /// Returns true if all zones have sensors with data.
-    /// </summary>
-    public bool ValidateZoneHierarchy()
-    {
-        var root = BuildZoneHierarchy();
-        return root.ValidateHierarchy();
-    }
-
-    /// <summary>
-    /// Recursively finds the first invalid zone in the hierarchy.
-    /// Returns the path to the invalid zone as a string.
-    /// </summary>
-    public string? FindMissingDataZone()
-    {
-        var root = BuildZoneHierarchy();
-        var invalidPath = root.FindFirstInvalidPath();
-        return invalidPath != null ? string.Join(" -> ", invalidPath) : null;
-    }
-
-    /// <summary>
-    /// Recursively counts all nodes in the zone hierarchy.
-    /// </summary>
-    public int CountZoneNodes()
-    {
-        var root = BuildZoneHierarchy();
-        return CountNodesRecursive(root);
-    }
-
-    private int CountNodesRecursive(DeploymentNode node)
-    {
-        int count = 1;
-        foreach (var child in node.Children)
-        {
-            count += CountNodesRecursive(child);
-        }
-        return count;
-    }
+    return root;
+}
 }

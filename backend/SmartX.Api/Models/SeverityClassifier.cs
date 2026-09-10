@@ -1,5 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
-
 namespace SmartX.Api.Models;
 
 public enum SeverityLevel
@@ -20,7 +18,7 @@ public static class SeverityClassifier
 
     public static SeverityLevel ClassifyPower(PowerReading current, PowerReading baseline)
     {
-        var delta = current - baseline; 
+        var delta = current - baseline;
         var percentChange = baseline.Watts == 0 ? 0 : Math.Abs(delta.Watts) / baseline.Watts;
 
         if (percentChange > 0.5) return SeverityLevel.Critical;
@@ -31,4 +29,3 @@ public static class SeverityClassifier
     public static SeverityLevel ClassifyValveState(bool isOpen, bool expectedOpen) =>
         isOpen != expectedOpen ? SeverityLevel.Warning : SeverityLevel.Normal;
 }
-
