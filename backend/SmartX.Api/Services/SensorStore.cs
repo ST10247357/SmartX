@@ -1,17 +1,29 @@
 using SmartX.Api.Models;
 
 namespace SmartX.Api.Services;
+
+// In-memory store keyed by MAC address for instant lookups when telemetry arrives.
 public class SensorStore
 {
     private readonly Dictionary<string, SensorRecord> _sensors = new();
     private readonly List<AlertRecord> _alerts = new();
     private readonly object _lock = new();
 
-    // Adapted from Thread-Safe Dictionary Mutation (Albahari & Albahari, 2021)
-    public SensorRecord Register(SensorRegistrationRequest request)
+    // Returns (record, error). If error is non-null, registration was rejected
+    // and record is null - the caller (Program.cs) should return 400 Bad Request.
+    public (SensorRecord? Record, string? Error) Register(SensorRegistrationRequest request)
     {
         lock (_lock)
         {
+            if (string.IsNullOrWhiteSpace(request.DeviceMacAddress))
+                return (null, "Device MAC address is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Zone))
+                return (null, "Zone is required.");
+
+            if (_sensors.ContainsKey(request.DeviceMacAddress))
+                return (null, $"Sensor {request.DeviceMacAddress} is already registered.");
+
             var record = new SensorRecord
             {
                 DeviceMacAddress = request.DeviceMacAddress,
@@ -19,17 +31,19 @@ public class SensorStore
                 Category = request.Category
             };
             _sensors[request.DeviceMacAddress] = record;
-            return record;
+            return (record, null);
         }
     }
 
-    // Adapted from C# Switch Expressions & Out Parameters for Safe Lookups (Microsoft, 2024b; GeeksforGeeks, 2023b)
     public SensorRecord? Ingest(TelemetryIngestRequest request)
     {
         lock (_lock)
         {
             if (!_sensors.TryGetValue(request.DeviceMacAddress, out var sensor))
                 return null;
+
+            if (request.Value < 0)
+                return null; // negative readings are never valid for moisture, power, or valve state
 
             var previousReading = sensor.LastReading; // capture before overwrite
             sensor.LastReading = request.Value;
@@ -85,7 +99,6 @@ public class SensorStore
         }
     }
 
-    // Adapted from LINQ Dynamic Projections and Aggregate Calculations (GeeksforGeeks, 2023c; Microsoft, 2024c)
     // Simple counts for the dashboard summary panel - no stored state to drift out of sync.
     public object GetSummary()
     {
@@ -125,8 +138,8 @@ public class SensorStore
         }
     }
 
-    // Adapted from Custom Operator Overloading Accumulation (GeeksforGeeks, 2023d)
-    // Adds together every power sensor's last reading in a zone using overloaded + operators.
+    // Adds together every power sensor's last reading in a zone, using the
+    // overloaded + operator instead of manually summing numbers.
     public PowerReading GetZoneTotalPower(string zone)
     {
         var total = new PowerReading(zone, 0);
@@ -138,8 +151,8 @@ public class SensorStore
         return total;
     }
 
-    // Adapted from Hierarchical Data Grouping & Composite Node Building (Fowler, 2002; GeeksforGeeks, 2022)
     // Builds a 3-level tree: Smart-X facility -> one node per zone -> one leaf per sensor.
+    // A sensor node is "configured" if it has reported a reading at least once.
     public DeploymentNode BuildZoneTree()
     {
         var root = new DeploymentNode { Name = "Smart-X Facility", IsConfigured = true };

@@ -35,6 +35,15 @@ export default function RegisterSensorForm({ onRegistered, colors }) {
       return;
     }
 
+    // Basic MAC/unique-ID format check: expects pairs of hex characters separated by colons,
+    // e.g. AA:BB:CC or AA:BB:01. Rejects obviously invalid input like plain words.
+    const macPattern = /^([0-9A-Fa-f]{2}:){2,}[0-9A-Fa-f]{2}$/;
+    if (!macPattern.test(mac.trim())) {
+      setStatus({ type: "error", message: "MAC address must be colon-separated hex pairs, e.g. AA:BB:01." });
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       await registerSensor({
         deviceMacAddress: mac.trim().toUpperCase(),

@@ -28,6 +28,22 @@ export default function FileUploadForm({ sensors, colors }) {
       return;
     }
 
+    // Restrict to sensible config/log/photo file types and a reasonable size cap.
+    const allowedTypes = [".txt", ".log", ".json", ".jpg", ".jpeg", ".png"];
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!allowedTypes.includes(extension)) {
+      setStatus({ type: "error", message: `File type ${extension} not allowed. Use: ${allowedTypes.join(", ")}` });
+      setIsUploading(false);
+      return;
+    }
+
+    const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSizeBytes) {
+      setStatus({ type: "error", message: "File is too large. Maximum size is 5MB." });
+      setIsUploading(false);
+      return;
+    }
+
     try {
       const result = await uploadFile(selectedMac, file);
       setStatus({ type: "success", message: `Uploaded ${result.fileName} to ${selectedMac}.` });
@@ -84,6 +100,7 @@ export default function FileUploadForm({ sensors, colors }) {
           <input
             id="fileInput"
             type="file"
+            accept=".txt,.log,.json,.jpg,.jpeg,.png"
             onChange={(e) => setFile(e.target.files[0])}
             style={{
               width: '100%',
