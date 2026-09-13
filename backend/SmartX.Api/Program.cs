@@ -16,6 +16,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+var encryptionKey = builder.Configuration["Encryption:Key"] ?? "SmartX-Fallback-Dev-Key-Do-Not-Use-In-Production";
+FileEncryptionHelper.Initialise(encryptionKey);
+
 var store = app.Services.GetRequiredService<SensorStore>();
 MockDataSeeder.Seed(store);
 
@@ -83,14 +86,16 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
     if (!allowedExtensions.Contains(extension))
         return Results.BadRequest(new { message = $"File type {extension} not allowed." });
 
-    const long maxSizeBytes = 5 * 1024 * 1024; // 5MB
+    const long maxSizeBytes = 5 * 1024 * 1024;
     if (file.Length > maxSizeBytes)
         return Results.BadRequest(new { message = "File exceeds 5MB limit." });
 
-    var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "Uploads", mac);
+    // MAC addresses contain colons, which Windows treats as a drive-letter
+    // separator in file paths - replace with a safe character for the folder name.
+    var safeMacFolder = mac.Replace(":", "-");
+    var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "Uploads", safeMacFolder);
     Directory.CreateDirectory(uploadsDir);
 
-    // Encrypt the file at rest rather than storing it as plain, readable bytes.
     await using var inputStream = file.OpenReadStream();
     var encryptedBytes = await FileEncryptionHelper.EncryptAsync(inputStream);
 
