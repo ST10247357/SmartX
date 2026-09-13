@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { getSummary } from "../api/client";
 
 export default function SummaryPanel({ refreshKey, colors }) {
-  // Adapted from React useState Hook for Summary State Management (React Docs, 2024a)
+  // Adapted from: React Docs (2024a) - "Synchronizing with Effects"
+  // Initializes state for storing summary network statistics metrics
   const [summary, setSummary] = useState(null);
 
+  // Default color palette tokens fallback for metric panel styling
   const darkColors = colors || {
     surface: '#161b22',
     surface2: '#1c2333',
@@ -16,14 +18,18 @@ export default function SummaryPanel({ refreshKey, colors }) {
     star: '#e3b341',
   };
 
-  // Adapted from React useEffect Data Fetching Pattern (React Docs, 2024a)
+  // Adapted from: React Docs (2024a) - "Synchronizing with Effects"
+  // Fetches aggregated summary stats on initial render and upon trigger of refreshKey updates
   useEffect(() => {
     getSummary().then(setSummary).catch(() => {});
   }, [refreshKey]);
 
-  // Adapted from Conditional Rendering Pattern (React Docs, 2024b)
+  // Adapted from: React Docs (2024b) - "Conditional Rendering"
+  // Prevents rendering markup prior to asynchronously populating summary data state
   if (!summary) return null;
 
+  // Adapted from: Developer Mozilla (2024a) - "Number.prototype.toFixed()"
+  // Maps API summary metrics into display items and formats floating point rating values
   const statItems = [
     { label: "Total Sensors", value: summary.totalSensors, color: darkColors.primary },
     { label: "Open Alerts", value: summary.openAlerts, color: summary.openAlerts > 0 ? darkColors.dangerText : darkColors.text },
@@ -31,6 +37,8 @@ export default function SummaryPanel({ refreshKey, colors }) {
     { label: "Avg Rating", value: `${summary.averageStarRating.toFixed(1)}★`, color: darkColors.star },
   ];
 
+  // Adapted from: W3Schools (2024) - "CSS Grid Layout"
+  // Renders metric dashboard grid cards using CSS Grid auto-fit and minmax layout rules
   return (
     <div
       style={{
@@ -44,6 +52,8 @@ export default function SummaryPanel({ refreshKey, colors }) {
         backgroundColor: darkColors.surface,
       }}
     >
+      {/* Adapted from: Developer Mozilla (2024b) - "Array.prototype.map()" */}
+      {/* Renders each metric summary entry as a styled metric card container */}
       {statItems.map((item, idx) => (
         <div
           key={idx}
@@ -71,7 +81,9 @@ export default function SummaryPanel({ refreshKey, colors }) {
 
 /*
 References:
-MDN Web Docs, 2024. Basic concepts of flexbox. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_flexible_box_layout/Basic_concepts_of_flexbox [Accessed 10 September 2026].
+Developer Mozilla, 2024a. Number.prototype.toFixed(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/toFixed [Accessed 10 September 2026].
+Developer Mozilla, 2024b. Array.prototype.map(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map [Accessed 10 September 2026].
 React Docs, 2024a. Synchronizing with Effects. React Documentation. Available at: https://react.dev/learn/synchronizing-with-effects [Accessed 10 September 2026].
 React Docs, 2024b. Conditional Rendering. React Documentation. Available at: https://react.dev/learn/conditional-rendering [Accessed 10 September 2026].
+W3Schools, 2024. CSS Grid Layout. W3Schools. Available at: https://www.w3schools.com/css/css_grid.asp [Accessed 10 September 2026].
 */

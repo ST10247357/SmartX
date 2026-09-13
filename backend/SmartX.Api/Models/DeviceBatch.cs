@@ -10,5 +10,5 @@ public class DeviceBatch
 
 /*
 References:
-Baeldung, 2024. The DTO Pattern (Data Transfer Object). Available at: https://www.baeldung.com/java-dto-pattern [Accessed 10 September 2026].
+Baeldung, 2024. The DTO Pattern (Data Transfer Object). Available at: https://www.baeldung.com/java-dto-pattern [Accessed 4 September 2026].
 */

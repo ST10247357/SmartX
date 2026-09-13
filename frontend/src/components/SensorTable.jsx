@@ -2,13 +2,15 @@ import { useState } from "react";
 import { getCategoryLabel, resolveAlert } from "../api/client";
 
 export default function SensorTable({ sensors, onResolved, colors }) {
-  // Adapted from React useState Hook for Sorting & Filtering State (React Docs, 2024a)
+  // Adapted from: React Docs (2024a) - "Rendering Lists"
+  // Initializes sorting criteria, multi-field filters, and async operation tracking states
   const [sortField, setSortField] = useState("deviceMacAddress");
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterZone, setFilterZone] = useState("all");
   const [resolving, setResolving] = useState(null);
 
+  // Default color tokens fallback for table interface styling
   const darkColors = colors || {
     surface: '#161b22',
     surface2: '#1c2333',
@@ -22,13 +24,18 @@ export default function SensorTable({ sensors, onResolved, colors }) {
     star: '#e3b341',
   };
 
+  // Adapted from: Developer Mozilla (2024a) - "Set"
+  // Extracts unique zone identifiers from the sensors collection for dropdown population
   const zones = ["all", ...new Set((sensors || []).map((s) => s.zone))];
 
-  // Adapted from Array Filtering & Sorting Logic in React (React Docs, 2024a)
+  // Adapted from: Developer Mozilla (2024b) - "Array.prototype.filter()"
+  // Filters raw sensor records based on category select value and selected location zone
   const filtered = (sensors || [])
     .filter((s) => filterCategory === "all" || s.category === parseInt(filterCategory))
     .filter((s) => filterZone === "all" || s.zone === filterZone);
 
+  // Adapted from: Developer Mozilla (2024c) - "Array.prototype.sort()"
+  // Dynamically sorts filtered rows by text locale comparison or numeric evaluation
   const sorted = [...filtered].sort((a, b) => {
     let aVal = a[sortField] ?? "";
     let bVal = b[sortField] ?? "";
@@ -38,6 +45,7 @@ export default function SensorTable({ sensors, onResolved, colors }) {
     return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
   });
 
+  // Updates table sorting column field or toggles sort direction order
   function handleSort(field) {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -47,7 +55,8 @@ export default function SensorTable({ sensors, onResolved, colors }) {
     }
   }
 
-  // Adapted from Asynchronous Handler Pattern (React Docs, 2024b)
+  // Adapted from: React Docs (2024b) - "Responding to Events"
+  // Dispatches async resolution request for active alert state on target sensor MAC
   async function handleResolve(mac) {
     setResolving(mac);
     try {
@@ -58,9 +67,11 @@ export default function SensorTable({ sensors, onResolved, colors }) {
     }
   }
 
+  // Helper utility functions for rendering column sorting arrows and visual rating indicators
   const sortIcon = (field) => (sortField !== field ? "↕" : sortDirection === "asc" ? "↑" : "↓");
   const stars = (rating) => "★".repeat(rating) + "☆".repeat(5 - rating);
 
+  // Render empty state feedback when no sensor items are supplied
   if (!sensors || sensors.length === 0) {
     return (
       <p style={{ color: darkColors.textSecondary, fontSize: 13, fontStyle: 'italic', padding: 12 }}>
@@ -69,6 +80,8 @@ export default function SensorTable({ sensors, onResolved, colors }) {
     );
   }
 
+  // Adapted from: W3Schools (2024) - "HTML Tables"
+  // Renders filter toolbars and dynamic sensor data rows with responsive alert highlights
   return (
     <div style={{ border: `1px solid ${darkColors.border}`, borderRadius: 8, overflow: "hidden", backgroundColor: darkColors.surface }}>
       <div style={{ padding: 10, display: "flex", gap: 10, borderBottom: `1px solid ${darkColors.border}`, alignItems: 'center' }}>
@@ -189,7 +202,10 @@ export default function SensorTable({ sensors, onResolved, colors }) {
 
 /*
 References:
-MDN Web Docs, 2024. HTML table styling and layout. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Learn/CSS/Building_blocks/Styling_tables [Accessed 10 September 2026].
-React Docs, 2024a. Rendering Lists. React Documentation. Available at: https://react.dev/learn/rendering-lists [Accessed 10 September 2026].
-React Docs, 2024b. Responding to Events. React Documentation. Available at: https://react.dev/learn/responding-to-events [Accessed 10 September 2026].
+Developer Mozilla, 2024a. Set. MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set [Accessed 2 September 2026].
+Developer Mozilla, 2024b. Array.prototype.filter(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter [Accessed 6 September 2026].
+Developer Mozilla, 2024c. Array.prototype.sort(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort [Accessed 1 September 2026].
+React Docs, 2024a. Rendering Lists. React Documentation. Available at: https://react.dev/learn/rendering-lists [Accessed 4 September 2026].
+React Docs, 2024b. Responding to Events. React Documentation. Available at: https://react.dev/learn/responding-to-events [Accessed 7 September 2026].
+W3Schools, 2024. HTML Tables. W3Schools. Available at: https://www.w3schools.com/html/html_tables.asp [Accessed 3 September 2026].
 */

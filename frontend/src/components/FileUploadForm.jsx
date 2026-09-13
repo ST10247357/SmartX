@@ -2,12 +2,14 @@ import { useState } from "react";
 import { uploadFile } from "../api/client";
 
 export default function FileUploadForm({ sensors, colors }) {
-  // Adapted from React useState Hook for Component Form State (React Docs, 2024b)
+  // Adapted from: React Docs (2024b) - "useState"
+  // Initializes component local state variables to track inputs, upload state, and feedback status messages
   const [selectedMac, setSelectedMac] = useState("");
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fallback color scheme object for UI styling theme consistency
   const darkColors = colors || {
     surface2: '#1c2333',
     border: '#30363d',
@@ -16,7 +18,8 @@ export default function FileUploadForm({ sensors, colors }) {
     primary: '#58a6ff',
   };
 
-  // Adapted from React Event Handling & Asynchronous Form Submissions (React Docs, 2024a)
+  // Adapted from: React Docs (2024a) - "Responding to Events"
+  // Prevents default form submission, validates file criteria, and dispatches API payload asynchronously
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus(null);
@@ -28,7 +31,8 @@ export default function FileUploadForm({ sensors, colors }) {
       return;
     }
 
-    // Restrict to sensible config/log/photo file types and a reasonable size cap.
+    // Adapted from: Developer Mozilla (2024a) - "String.prototype.slice()"
+    // Extracts file extension using lastIndexOf to enforce strict upload type restrictions
     const allowedTypes = [".txt", ".log", ".json", ".jpg", ".jpeg", ".png"];
     const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
     if (!allowedTypes.includes(extension)) {
@@ -48,7 +52,9 @@ export default function FileUploadForm({ sensors, colors }) {
       const result = await uploadFile(selectedMac, file);
       setStatus({ type: "success", message: `Uploaded ${result.fileName} to ${selectedMac}.` });
       setFile(null);
-      // Adapted from HTML5 File Input Handling & Value Resetting (MDN Web Docs, 2024)
+      
+      // Adapted from: MDN Web Docs (2024b) - "HTMLInputElement.files"
+      // Resets file input value directly in the DOM post successful file upload
       document.getElementById('fileInput').value = '';
     } catch (err) {
       setStatus({ type: "error", message: err.message });
@@ -57,6 +63,8 @@ export default function FileUploadForm({ sensors, colors }) {
     }
   }
 
+  // Adapted from: W3Schools (2024) - "React Forms"
+  // Render file selection and dynamic sensor dropdown inputs within styled JSX layout
   return (
     <form onSubmit={handleSubmit}>
       <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 15, color: darkColors.text }}>
@@ -145,7 +153,9 @@ export default function FileUploadForm({ sensors, colors }) {
 
 /*
 References:
-MDN Web Docs, 2024. HTMLInputElement.files. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/files [Accessed 10 September 2026].
-React Docs, 2024a. Responding to Events. React Documentation. Available at: https://react.dev/learn/responding-to-events [Accessed 10 September 2026].
-React Docs, 2024b. useState. React Documentation. Available at: https://react.dev/reference/react/useState [Accessed 10 September 2026].
+Developer Mozilla, 2024a. String.prototype.slice(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/slice [Accessed 3 September 2026].
+MDN Web Docs, 2024b. HTMLInputElement.files. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/files [Accessed 1 September 2026].
+React Docs, 2024a. Responding to Events. React Documentation. Available at: https://react.dev/learn/responding-to-events [Accessed 6 September 2026].
+React Docs, 2024b. useState. React Documentation. Available at: https://react.dev/reference/react/useState [Accessed 4 September 2026].
+W3Schools, 2024. React Forms. W3Schools. Available at: https://www.w3schools.com/react/react_forms.asp [Accessed 2 September 2026].
 */

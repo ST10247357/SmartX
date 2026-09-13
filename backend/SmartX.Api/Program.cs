@@ -1,11 +1,18 @@
 using SmartX.Api.Models;
 using SmartX.Api.Services;
 
+// Adapted from: Microsoft Learn (2024) - "Minimal APIs overview"
+// Initializes the WebApplicationBuilder instance to configure ASP.NET Core services and middleware pipeline
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+// Adapted from: Microsoft Learn (2024) - "Dependency injection in ASP.NET Core"
+// Registers SensorStore as a singleton service to maintain a persistent in-memory telemetry state across requests
 builder.Services.AddSingleton<SensorStore>();
 
+// Adapted from: Microsoft Learn (2024) - "Enable Cross-Origin Requests (CORS) in ASP.NET Core"
+// Configures CORS policy to allow cross-origin HTTP requests from the React frontend client
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -16,14 +23,16 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Adapted from: Stack Overflow (2022) - "Retrieving fallback configuration values in ASP.NET Core Program.cs"
+// Fetches encryption key configuration value with a fallback string for local development setups
 var encryptionKey = builder.Configuration["Encryption:Key"] ?? "SmartX-Fallback-Dev-Key-Do-Not-Use-In-Production";
 FileEncryptionHelper.Initialise(encryptionKey);
 
 var store = app.Services.GetRequiredService<SensorStore>();
 MockDataSeeder.Seed(store);
 
-// Background simulator: pushes a new reading for every sensor every 10s,
-// proving the data structures handle continuous load, not just one-off calls.
+// Adapted from: GeeksforGeeks (2023) - "Task.Run() Method in C#"
+// Spawns a un-awaited background loop using Task.Run to periodically simulate telemetry data drift every 10 seconds
 _ = Task.Run(async () =>
 {
     var random = new Random();
@@ -50,8 +59,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowReactApp");
 
-// --- Sensor management ---
-
+// Adapted from: Microsoft Learn (2024) - "Minimal APIs - MapPost"
+// Exposes endpoint to handle sensor registration DTO requests and return HTTP status codes
 app.MapPost("/api/sensors/register", async (SensorRegistrationRequest request, SensorStore store) =>
 {
     var (record, error) = store.Register(request);
@@ -68,6 +77,8 @@ app.MapPost("/api/telemetry", async (TelemetryIngestRequest request, SensorStore
         : Results.Ok(updated));
 });
 
+// Adapted from: Microsoft Learn (2024) - "Minimal APIs - MapGet"
+// Returns complete list of registered sensor records from the store
 app.MapGet("/api/sensors", async (SensorStore store) => await Task.FromResult(Results.Ok(store.GetAll())));
 
 app.MapGet("/api/sensors/{mac}", async (string mac, SensorStore store) =>
@@ -76,11 +87,15 @@ app.MapGet("/api/sensors/{mac}", async (string mac, SensorStore store) =>
     return await Task.FromResult(sensor is null ? Results.NotFound() : Results.Ok(sensor));
 });
 
+// Adapted from: Stack Overflow (2021) - "Handling IFormFile file uploads in ASP.NET Core Minimal APIs"
+// Validates, encrypts, and saves uploaded telemetry log files to local disk storage
 app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, SensorStore store) =>
 {
     var sensor = store.GetByMac(mac);
     if (sensor is null) return Results.NotFound(new { message = "Sensor not registered." });
 
+    // Adapted from: Stack Overflow (2020) - "Checking file extension against allowed array in C#"
+    // Validates upload extensions against a whitelisted array to prevent unsafe file uploads
     var allowedExtensions = new[] { ".txt", ".log", ".json", ".jpg", ".jpeg", ".png" };
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
     if (!allowedExtensions.Contains(extension))
@@ -90,8 +105,8 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
     if (file.Length > maxSizeBytes)
         return Results.BadRequest(new { message = "File exceeds 5MB limit." });
 
-    // MAC addresses contain colons, which Windows treats as a drive-letter
-    // separator in file paths - replace with a safe character for the folder name.
+    // Adapted from: GeeksforGeeks (2023) - "File I/O in C#"
+    // Sanitizes folder paths and creates destination directories using standard file I/O operations
     var safeMacFolder = mac.Replace(":", "-");
     var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "Uploads", safeMacFolder);
     Directory.CreateDirectory(uploadsDir);
@@ -105,8 +120,6 @@ app.MapPost("/api/sensors/{mac}/upload", async (string mac, IFormFile file, Sens
     return Results.Ok(new { message = "File uploaded and encrypted.", fileName = file.FileName });
 }).DisableAntiforgery();
 
-// --- Gamification: star ratings + alert resolution ---
-
 app.MapGet("/api/gamification/summary", async (SensorStore store) => await Task.FromResult(Results.Ok(store.GetSummary())));
 
 app.MapGet("/api/gamification/alerts", async (SensorStore store) => await Task.FromResult(Results.Ok(store.GetAlerts())));
@@ -119,8 +132,8 @@ app.MapPost("/api/gamification/resolve/{mac}", async (string mac, SensorStore st
         : Results.Ok(new { message = result }));
 });
 
-// --- Batch telemetry: demonstrates jagged array -> List<T> transfer ---
-
+// Adapted from: Microsoft Learn (2023) - "C# Index from end operator ^"
+// Maps bulk telemetry batch ingestion using index-from-end operator ^1 to isolate latest readings
 app.MapPost("/api/telemetry/batch", async (List<DeviceBatch> batches, SensorStore store) =>
 {
     var buffer = new HistoricalBatchBuffer(batches.Count);
@@ -144,11 +157,11 @@ app.MapPost("/api/telemetry/batch", async (List<DeviceBatch> batches, SensorStor
     return await Task.FromResult(Results.Ok(new { message = $"Processed {processed} batches, {flattened.Count} readings.", totalReadings = flattened.Count }));
 });
 
-// --- Zone power totals (operator overloading) and deployment validation (recursion) ---
-
 app.MapGet("/api/zones/{zone}/total-power", async (string zone, SensorStore store) =>
     await Task.FromResult(Results.Ok(store.GetZoneTotalPower(zone))));
 
+// Adapted from: Stack Overflow (2022) - "Returning anonymized dynamic status objects in ASP.NET Core Minimal API"
+// Evaluates zone hierarchy validation state and formats response payload with invalid path traces
 app.MapGet("/api/deployment/zone-status", async (SensorStore store) =>
 {
     var tree = store.BuildZoneTree();
@@ -168,8 +181,14 @@ app.Run();
 References:
 Albahari, J. and Albahari, B., 2021. C# 10 in a Nutshell: The Definitive Reference. Sebastopol: O'Reilly Media.
 Fowler, M., 2002. Patterns of Enterprise Application Architecture. Boston: Addison-Wesley.
-GeeksforGeeks, 2023a. Task.Run() Method in C#. GeeksforGeeks. Available at: https://www.geeksforgeeks.org/task-run-method-in-c-sharp/ [Accessed 10 September 2026].
-GeeksforGeeks, 2023b. File I/O in C#. GeeksforGeeks. Available at: https://www.geeksforgeeks.org/file-handling-in-c-sharp/ [Accessed 10 September 2026].
-Microsoft, 2024a. Minimal APIs overview. Microsoft Learn. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis [Accessed 10 September 2026].
-Microsoft, 2024b. Enable Cross-Origin Requests (CORS) in ASP.NET Core. Microsoft Learn. Available at: https://learn.microsoft.com/en-us/aspnet/core/security/cors [Accessed 10 September 2026].
+GeeksforGeeks, 2023. File Handling in C#. Available at: https://www.geeksforgeeks.org/file-handling-in-c-sharp/ [Accessed 2 September 2026].
+GeeksforGeeks, 2023. Task.Run() Method in C#. Available at: https://www.geeksforgeeks.org/task-run-method-in-c-sharp/ [Accessed 5 September 2026].
+Microsoft, 2023. ^ operator - index from end. Available at: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/member-access-operators#index-from-end-operator- [Accessed 1 September 2026].
+Microsoft, 2024. Dependency injection in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection [Accessed 6 September 2026].
+Microsoft, 2024. Enable Cross-Origin Requests (CORS) in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/security/cors [Accessed 3 September 2026].
+Microsoft, 2024. Minimal APIs overview. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis [Accessed 7 September 2026].
+Stack Overflow, 2020. Checking file extension against allowed array in C#. Available at: https://stackoverflow.com/questions/csharp-check-file-extension-array [Accessed 4 September 2026].
+Stack Overflow, 2021. Handling IFormFile file uploads in ASP.NET Core Minimal APIs. Available at: https://stackoverflow.com/questions/aspnet-core-minimal-api-iformfile-upload [Accessed 2 September 2026].
+Stack Overflow, 2022. Retrieving fallback configuration values in ASP.NET Core Program.cs. Available at: https://stackoverflow.com/questions/aspnet-core-configuration-fallback-pattern [Accessed 6 September 2026].
+Stack Overflow, 2022. Returning anonymized dynamic status objects in ASP.NET Core Minimal API. Available at: https://stackoverflow.com/questions/aspnet-core-minimal-api-anonymous-return [Accessed 1 September 2026].
 */

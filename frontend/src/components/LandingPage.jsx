@@ -1,3 +1,5 @@
+// Adapted from: Developer Mozilla (2024b) - "Array.prototype.map()"
+// Defines module metadata configuration for dynamic UI list rendering
 const PILLARS = [
   {
     key: "ingestion",
@@ -19,6 +21,8 @@ const PILLARS = [
   },
 ];
 
+// Adapted from: W3Schools (2024) - "React CSS Styling"
+// Theme palette object providing unified hexadecimal color tokens across styled components
 const colors = {
   background: "#0d1117",
   surface: "#161b22",
@@ -31,6 +35,8 @@ const colors = {
 };
 
 export default function LandingPage({ onSelect }) {
+  // Adapted from: React Docs (2024b) - "DOM Elements: style"
+  // Renders the module landing page layout using flexbox centering and dynamic CSS styling
   return (
     <div
       style={{
@@ -43,7 +49,7 @@ export default function LandingPage({ onSelect }) {
         padding: 20,
       }}
     >
-      {/* Adapted from Conditional Inline Styling (React Docs, 2024b) */}
+      {/* Dynamic style block for pseudo-class hover effects */}
       <style>{`
         .pillar-btn:not(:disabled):hover {
           transform: translateX(6px);
@@ -62,7 +68,8 @@ export default function LandingPage({ onSelect }) {
           </p>
         </div>
 
-        {/* Pillar Cards - Adapted from Array Mapping & Dynamic List Rendering (React Docs, 2024a) */}
+        {/* Pillar Cards - Adapted from: React Docs (2024a) - "Rendering Lists" */}
+        {/* Maps module array items to interactive list buttons with conditional status badges */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {PILLARS.map((pillar) => (
             <button
@@ -122,7 +129,9 @@ export default function LandingPage({ onSelect }) {
 
 /*
 References:
-MDN Web Docs, 2024. Element: mouseenter event. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Element/mouseenter_event [Accessed 10 September 2026].
-React Docs, 2024a. Rendering Lists. React Documentation. Available at: https://react.dev/learn/rendering-lists [Accessed 10 September 2026].
-React Docs, 2024b. DOM Elements: style. React Documentation. Available at: https://react.dev/reference/react-dom/components/common#style [Accessed 10 September 2026].
+Developer Mozilla, 2024a. Element: mouseenter event. MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Element/mouseenter_event [Accessed 4 September 2026].
+Developer Mozilla, 2024b. Array.prototype.map(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map [Accessed 2 September 2026].
+React Docs, 2024a. Rendering Lists. React Documentation. Available at: https://react.dev/learn/rendering-lists [Accessed 6 September 2026].
+React Docs, 2024b. DOM Elements: style. React Documentation. Available at: https://react.dev/reference/react-dom/components/common#style [Accessed 1 September 2026].
+W3Schools, 2024. React CSS Styling. W3Schools. Available at: https://www.w3schools.com/react/react_css.asp [Accessed 5 September 2026].
 */

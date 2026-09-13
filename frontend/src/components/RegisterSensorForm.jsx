@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { registerSensor } from "../api/client";
 
+// Adapted from: Developer Mozilla (2024b) - "Array.prototype.map()"
+// Static metadata array defining available sensor category dropdown options
 const CATEGORY_OPTIONS = [
   { value: 0, label: "Environmental", description: "Temperature, moisture, humidity" },
   { value: 1, label: "Power Consumption", description: "Energy usage monitoring" },
@@ -8,13 +10,15 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function RegisterSensorForm({ onRegistered, colors }) {
-  // Adapted from React useState Hook for Form Controlled State (React Docs, 2024a)
+  // Adapted from: React Docs (2024a) - "Sharing State Between Components"
+  // Initializes component state variables to manage controlled input fields and submission lifecycle states
   const [mac, setMac] = useState("");
   const [zone, setZone] = useState("");
   const [category, setCategory] = useState(0);
   const [status, setStatus] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Default color palette fallback configuration for form styling
   const darkColors = colors || {
     surface2: '#1c2333',
     border: '#30363d',
@@ -23,7 +27,8 @@ export default function RegisterSensorForm({ onRegistered, colors }) {
     primary: '#58a6ff',
   };
 
-  // Adapted from Client-Side Form Validation & Async Handlers (React Docs, 2024b)
+  // Adapted from: React Docs (2024b) - "Form Components"
+  // Handles form submission, performs MAC address regex validation, and dispatches API payload
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus(null);
@@ -35,8 +40,8 @@ export default function RegisterSensorForm({ onRegistered, colors }) {
       return;
     }
 
-    // Basic MAC/unique-ID format check: expects pairs of hex characters separated by colons,
-    // e.g. AA:BB:CC or AA:BB:01. Rejects obviously invalid input like plain words.
+    // Adapted from: Developer Mozilla (2024a) - "RegExp"
+    // Validates MAC address structure against colon-separated hex byte sequences
     const macPattern = /^([0-9A-Fa-f]{2}:){2,}[0-9A-Fa-f]{2}$/;
     if (!macPattern.test(mac.trim())) {
       setStatus({ type: "error", message: "MAC address must be colon-separated hex pairs, e.g. AA:BB:01." });
@@ -61,6 +66,8 @@ export default function RegisterSensorForm({ onRegistered, colors }) {
     }
   }
 
+  // Adapted from: W3Schools (2024) - "React Forms"
+  // Renders registration form components with event handlers and dynamic focus styling
   return (
     <form onSubmit={handleSubmit}>
       <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 15, color: darkColors.text }}>
@@ -174,7 +181,9 @@ export default function RegisterSensorForm({ onRegistered, colors }) {
 
 /*
 References:
-MDN Web Docs, 2024. Element: focus event. Mozilla Developer Network. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Element/focus_event [Accessed 10 September 2026].
-React Docs, 2024a. Sharing State Between Components: Controlled and Uncontrolled Components. React Documentation. Available at: https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components [Accessed 10 September 2026].
-React Docs, 2024b. Form Components. React Documentation. Available at: https://react.dev/reference/react-dom/components/input [Accessed 10 September 2026].
+Developer Mozilla, 2024a. RegExp. MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp [Accessed 3 September 2026].
+Developer Mozilla, 2024b. Array.prototype.map(). MDN Web Docs. Available at: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map [Accessed 1 September 2026].
+React Docs, 2024a. Sharing State Between Components: Controlled and Uncontrolled Components. React Documentation. Available at: https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components [Accessed 7 September 2026].
+React Docs, 2024b. Form Components. React Documentation. Available at: https://react.dev/reference/react-dom/components/input [Accessed 5 September 2026].
+W3Schools, 2024. React Forms. W3Schools. Available at: https://www.w3schools.com/react/react_forms.asp [Accessed 2 September 2026].
 */
