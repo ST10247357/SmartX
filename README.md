@@ -1,111 +1,131 @@
-# Smart-X IoT Mesh Ecosystem
+# PROG7312-POE - PART 1 - Smart-X IoT Mesh Ecosystem
 
-Part 1: Sensor Data Ingestion and Validation Gateway, for a simulated hybrid IoT mesh covering hydroponic farm monitoring, real estate utility tracking, and smart grid installations.
+A hybrid IoT mesh gateway built to ingest, validate, and monitor telemetry from distributed sensors across hydroponic farms, real estate utility tracking, and smart grid installations.
 
-## Architecture
+## Overview
 
-- **Backend:** ASP.NET Core Minimal API (.NET 10)
-- **Frontend:** React (Vite)
-- **Data storage:** In-memory (`Dictionary<string, SensorRecord>`) - resets when the API restarts; this is expected for a coursework-scale simulation, not a bug.
-- **Data seeding:** `MockDataSeeder` pre-loads 7 sensors across all three scenarios on startup, plus a background simulator that nudges every sensor's reading every 10 seconds to prove the data structures hold up under continuous load.
+Smart-X replaces manual, ad-hoc device monitoring with a modernised ASP.NET Core Minimal API and React dashboard. It ingests high-throughput telemetry from simulated ESP32-style devices, validates readings against category-specific thresholds, and keeps operators engaged through a gamified alert system rather than a passive log.
 
-```
-React Dashboard  <-- HTTP (JSON) -->  ASP.NET Core Minimal API  <-- method calls -->  SensorStore
-```
+## Features
 
-## Features implemented (Part 1)
+- 📡 **Sensor Registration & Telemetry Ingestion** — register devices by MAC address, zone, and category; push live readings via API
+- ⭐ **Proactive Alert Gamification** — every sensor holds a star rating (5 = healthy); a critical reading drops it to 1 star and logs an alert; operators click **Resolve** to restore a star and log the resolution
+- ⚡ **Severity Classification** — power spikes are treated as more critical than equivalent drops, using overloaded comparison operators
+- 📎 **Encrypted File Uploads** — config files, deployment photos, and hardware logs are AES-256 encrypted at rest, restricted by file type and size
+- 🌳 **Deployment Hierarchy Validation** — recursively validates arbitrarily deep facility/zone/sensor trees
+- 🔢 **Zone Power Totals** — aggregates power readings across a zone using overloaded operators
+- 🧪 **Mock Data Seeding** — seeds sensors across all three IoT scenarios, plus a background simulator that continuously drifts readings to prove the system holds up under load
 
-- Startup landing page with three module tiles; only "Sensor Data Ingestion and Telemetry" is active (the other two are scoped for Part 2 and the final PoE).
-- Sensor registration form (MAC address, zone, category).
-- Telemetry ingestion endpoint, with severity classification per sensor category.
-- File/log/photo upload, attached to a specific sensor.
-- Sortable, filterable sensor table (by category, by zone).
-- **Dynamic engagement feature - proactive alert gamification:** every sensor has a star rating (5 = healthy). A critical reading drops it to 1 star and logs an alert. The operator clicks **Resolve** to acknowledge it, restoring one star and incrementing that sensor's resolution count. A summary panel shows total sensors, open alerts, total resolutions, and average star rating across all sensors.
-- Power spikes (rising above threshold) are classified as more severe (Critical) than equivalent drops (Warning), using the overloaded comparison operators on `PowerReading`.
+## Key Requirements Covered
 
-## Technical requirements covered
-
-| Requirement | Where |
+| Requirement | Implementation |
 |---|---|
 | Generics | `TelemetryPacket<T>` |
-| Operator overloading (`+`, `-`, `>`, `<`) | `PowerReading` struct, used in `SeverityClassifier` and `SensorStore.GetZoneTotalPower()` |
-| Advanced arrays (jagged → `List<T>`) | `HistoricalBatchBuffer`, exercised via `POST /api/telemetry/batch` |
-| Recursion | `DeploymentNode.ValidateHierarchy()` / `FindFirstInvalidPath()`, exercised via `GET /api/deployment/zone-status` |
-| Collections (`Dictionary`, `List`) | `SensorStore` throughout |
+| Operator Overloading | `PowerReading` (`+`, `-`, `>`, `<`) |
+| Advanced Arrays (jagged → List) | `HistoricalBatchBuffer` |
+| Recursion (variable depth) | `DeploymentNode` |
+| Collections | `Dictionary<string, SensorRecord>` in `SensorStore` |
 
-## Setup
+## Tech Stack
+
+- ASP.NET Core Minimal API (.NET 10)
+- React (Vite)
+- In-memory data store (no external database — coursework scale)
+- AES-256 encryption via `System.Security.Cryptography`
+
+## Getting Started
 
 ### Prerequisites
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) - confirm with `dotnet --list-sdks`
-- [Node.js](https://nodejs.org) (LTS) — confirm with `node -v`
-- **Note:** Visual Studio 2022 cannot target `.NET 10` projects. This project was built and should be run using **VS Code** with the C# Dev Kit extension, or any editor plus the `dotnet` CLI directly.
 
-### Backend
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Node.js](https://nodejs.org) (LTS)
+
+> **Note:** Visual Studio 2022 cannot target .NET 10 projects. Use **VS Code** with the C# Dev Kit extension, or the `dotnet` CLI directly.
+
+### Configuration
+
+Set the file encryption key via .NET User Secrets (kept out of source control):
+```bash
+cd backend/SmartX.Api
+dotnet user-secrets init
+dotnet user-secrets set "Encryption:Key" "your-own-secret-string"
+```
+If not set, a fallback development key is used automatically.
+
+### Run the project
+
+**Backend:**
 ```bash
 cd backend/SmartX.Api
 dotnet restore
 dotnet run
 ```
-Note the URL it prints (e.g. `http://localhost:5275`) - the frontend expects the API at this address (configured in `frontend/src/api/client.js`).
 
-### Frontend
-In a second terminal:
+**Frontend** (new terminal):
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open the printed URL (usually `http://localhost:5173`).
 
-**Both servers must be running at the same time** for the dashboard to load data.
+Both servers must run simultaneously. Open the frontend URL (usually `http://localhost:5173`).
 
-## Testing the engagement feature
+## Quick Test
 
-1. Open the dashboard and click into "Sensor Data Ingestion and Telemetry."
-2. The seeded sensors load automatically - note `AA:BB:02` (dry moisture sensor) already shows 1 star.
-3. Open the browser console (F12) and send a critical reading manually:
+1. Open the dashboard → "Sensor Data Ingestion and Telemetry."
+2. Trigger a critical reading via the browser console:
    ```js
    fetch("http://localhost:5275/api/telemetry", {
      method: "POST",
      headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ deviceMacAddress: "BB:CC:01", value: 9999 })
+     body: JSON.stringify({ deviceMacAddress: "AA:BB:01", value: 5 })
    }).then(r => r.json()).then(console.log)
    ```
-4. Refresh the table (or wait 5 seconds for the automatic poll) — `BB:CC:01` should now show 1 star.
-5. Click **Resolve** next to it — the star count increases and the resolution count updates in the summary panel.
+3. Refresh the table — the sensor drops to 1 star. Click **Resolve** to restore it.
 
-## API endpoints
+## API Endpoints
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/api/sensors/register` | Register a new sensor |
-| POST | `/api/telemetry` | Push a single reading |
-| POST | `/api/telemetry/batch` | Push multiple devices' batched readings (jagged array demo) |
+| POST | `/api/sensors/register` | Register a sensor |
+| POST | `/api/telemetry` | Push a reading |
+| POST | `/api/telemetry/batch` | Push multiple devices' batched readings |
 | GET | `/api/sensors` | List all sensors |
-| GET | `/api/sensors/{mac}` | Get one sensor |
-| POST | `/api/sensors/{mac}/upload` | Attach a file to a sensor |
+| POST | `/api/sensors/{mac}/upload` | Upload & encrypt a file for a sensor |
 | GET | `/api/gamification/summary` | Dashboard summary counts |
-| GET | `/api/gamification/alerts` | Alert history |
-| POST | `/api/gamification/resolve/{mac}` | Resolve a sensor's open alert |
-| GET | `/api/zones/{zone}/total-power` | Sum power readings in a zone (operator overloading demo) |
-| GET | `/api/deployment/zone-status` | Validate the facility/zone/sensor hierarchy (recursion demo) |
+| POST | `/api/gamification/resolve/{mac}` | Resolve a sensor's alert |
+| GET | `/api/zones/{zone}/total-power` | Sum power readings in a zone |
+| GET | `/api/deployment/zone-status` | Validate the facility/zone/sensor tree |
 
-## Known limitations
-
-- Data is in-memory only; restarting the backend clears all registered sensors and alert history back to the seeded defaults.
-- The background simulator has no bounds on how far a reading can drift over a long-running session - acceptable for a short demo, not intended for production use.
-
-## Project structure
+## Project Structure
 
 ```
 SmartX/
 ├── backend/
 │   └── SmartX.Api/
-│       ├── Models/       (TelemetryPacket, PowerReading, DeploymentNode, SeverityClassifier, etc.)
-│       ├── Services/     (SensorStore, MockDataSeeder)
+│       ├── Models/          # TelemetryPacket, PowerReading, DeploymentNode, SeverityClassifier, AlertRecord, Dtos, DeviceBatch, HistoricalBatchBuffer
+│       ├── Services/        # SensorStore, MockDataSeeder, FileEncryptionHelper
 │       └── Program.cs
 └── frontend/
     └── src/
         ├── api/client.js
-        └── components/   (LandingPage, Dashboard, SensorTable, RegisterSensorForm, FileUploadForm, SummaryPanel)
+        └── components/      # LandingPage, Dashboard, SensorTable, RegisterSensorForm, FileUploadForm, SummaryPanel
 ```
+
+## Known Limitations
+
+- In-memory storage only — restarting the backend resets all data to the seeded defaults.
+- The background telemetry simulator has no bounds on long-running drift; acceptable for a short demo, not production use.
+
+## YouTube Link
+
+[Insert YouTube link here]
+
+## References
+
+See [REFERENCES.md](./REFERENCES.md) for a full list of sources used.
+
+## Author
+
+[Insert student number] — PROG7312 / AAPD7112 POE Part 1
+IIE Varsity College
