@@ -151,25 +151,40 @@ public class SensorStore
         return total;
     }
 
-    // Builds a 3-level tree: Smart-X facility -> one node per zone -> one leaf per sensor.
-    // A sensor node is "configured" if it has reported a reading at least once.
+    // Builds a variable-depth tree from each sensor's zone path. A zone can be a
+    // single name ("Greenhouse-A") for a flat hierarchy, or a "/"-separated path
+    // ("Facility-A/Zone-1/Sub-Zone-B") for arbitrarily deep nesting - matching the
+    // brief's own example of Sub-Zone B -> Zone 1 -> Facility A. Shared path
+    // segments across sensors reuse the same node instead of duplicating it.
+    // A sensor leaf is "configured" if it has reported a reading at least once.
     public DeploymentNode BuildZoneTree()
     {
         var root = new DeploymentNode { Name = "Smart-X Facility", IsConfigured = true };
+        var nodeByPath = new Dictionary<string, DeploymentNode>();
 
-        var zoneGroups = _sensors.Values.GroupBy(s => s.Zone);
-        foreach (var group in zoneGroups)
+        foreach (var sensor in _sensors.Values)
         {
-            var zoneNode = new DeploymentNode { Name = group.Key, IsConfigured = true };
-            foreach (var sensor in group)
+            var pathParts = sensor.Zone.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var currentNode = root;
+            var currentPath = "";
+
+            foreach (var part in pathParts)
             {
-                zoneNode.Children.Add(new DeploymentNode
+                currentPath += "/" + part;
+                if (!nodeByPath.TryGetValue(currentPath, out var zoneNode))
                 {
-                    Name = sensor.DeviceMacAddress,
-                    IsConfigured = sensor.LastReading.HasValue
-                });
+                    zoneNode = new DeploymentNode { Name = part, IsConfigured = true };
+                    nodeByPath[currentPath] = zoneNode;
+                    currentNode.Children.Add(zoneNode);
+                }
+                currentNode = zoneNode;
             }
-            root.Children.Add(zoneNode);
+
+            currentNode.Children.Add(new DeploymentNode
+            {
+                Name = sensor.DeviceMacAddress,
+                IsConfigured = sensor.LastReading.HasValue
+            });
         }
 
         return root;

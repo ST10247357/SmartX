@@ -19,6 +19,8 @@ public static class MockDataSeeder
 
             ("CC:DD:01", "Substation-3", SensorCategory.PowerConsumption, 4200f),
             ("CC:DD:02", "Substation-3", SensorCategory.PowerConsumption, 4150f),
+
+            ("EE:FF:03", "Facility-A/Zone-1/Sub-Zone-B", SensorCategory.Environmental, 55f),
         };
 
         foreach (var s in sensors)
